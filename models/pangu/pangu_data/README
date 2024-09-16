@@ -1,0 +1,5 @@
+Template data to run filter with single pangu file
+
+note: File too large to be uploaded to github. can be find on lililei4@202.119.37.253:/share/home/lililei4/haoxing/DART/models/pangu/pangu_data
+
+note: need to set perturb_from_single_instance = .true., in input.nml %filter_nml
