@@ -467,7 +467,7 @@ istatus(:) = 0
 ! For u or v (on velocity grid)
 
 ps(1,1,:) = get_val(state_handle, ens_size, lon_index, lat_index, -1, QTY_SURFACE_PRESSURE)
-write(*, *) "get_val_pressure: stage0"
+! write(*, *) "get_val_pressure: stage0"
 do e = 1, ens_size
    ! Next, get the values on the levels for this ps,
    ! haoxing: this need some thoughts.
@@ -483,8 +483,8 @@ do e = 1, ens_size
    ! What to do about pressures above top??? Just use the top for now.
    ! Could extrapolate, but that would be very tricky. Might need to
    ! reject somehow.
-   write(*, *) "pfull:", pfull
-   write(*, *) "pressure:", pressure
+   ! write(*, *) "pfull:", pfull
+   ! write(*, *) "pressure:", pressure
    if(pressure > pfull(1, 1, 1)) then
       top_lev(e) = 1
       bot_lev(e) = 2
@@ -499,7 +499,7 @@ do e = 1, ens_size
    ! Actually, just fail using istatus
       istatus(e) = 1
    else
-      write(*, *) "get_val_pressure: stage1"
+      ! write(*, *) "get_val_pressure: stage1"
       ! Search down through pressures
       do i = 2, grid_data%nvert
          if(pressure > pfull(1, 1, i)) then
@@ -507,14 +507,14 @@ do e = 1, ens_size
                bot_lev(e) = i
                rfrac(e) = (pfull(1, 1, bot_lev(e)) - pressure) / &
                (pfull(1, 1, bot_lev(e)) - pfull(1, 1, i - top_lev(e)))
-               write(*, *) "top_lev: ", top_lev
-               write(*, *) "bot_lev: ", bot_lev
-               write(*, *) "rfrac: ", rfrac
+               ! write(*, *) "top_lev: ", top_lev
+               ! write(*, *) "bot_lev: ", bot_lev
+               ! write(*, *) "rfrac: ", rfrac
 
             goto 21
          endif
       end do
-      write(*, *) "get_val_pressure: stage2"
+      ! write(*, *) "get_val_pressure: stage2"
    end if
    21 continue
 enddo
@@ -525,16 +525,16 @@ do e = 1, ens_size
    ! Find the index into state array and return this value
    state_index_bottom(e) = get_dart_vector_index(lon_index, lat_index, bot_lev(e), dom_id, model_type)
    state_index_top(e)    = get_dart_vector_index(lon_index, lat_index, top_lev(e), dom_id, model_type)
-   write(*, *) "state_index_bottom: ", state_index_bottom
-   write(*, *) "state_index_top: ", state_index_top
+   ! write(*, *) "state_index_bottom: ", state_index_bottom
+   ! write(*, *) "state_index_top: ", state_index_top
 enddo
-write(*, *) "get_val_pressure: stage3"
-write(*, *) "state_index_bottom: ", state_index_bottom
-write(*, *) "state_index_top: ", state_index_top
+! write(*, *) "get_val_pressure: stage3"
+! write(*, *) "state_index_bottom: ", state_index_bottom
+! write(*, *) "state_index_top: ", state_index_top
 
 call get_state_array(bot_val, state_index_bottom, state_handle)
 call get_state_array(top_val, state_index_top,    state_handle)
-write(*, *) "get_val_pressure: stage4"
+! write(*, *) "get_val_pressure: stage4"
 do e = 1, ens_size
    val_pressure(e) = (1.0_r8 - rfrac(e)) * bot_val(e) + rfrac(e) * top_val(e)
 enddo 
