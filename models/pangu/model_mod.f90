@@ -300,7 +300,7 @@ tmp_status = 0
 ! Get the position, determine if it is model level or pressure in vertical
 lon_lat_lev = get_location(location)
 lon = lon_lat_lev(1); lat = lon_lat_lev(2); 
-write(*, *) "locatioin is: ", lon_lat_lev
+! write(*, *) "locatioin is: ", lon_lat_lev
 if(is_vertical(location, "LEVEL")) then 
    level = lon_lat_lev(3)
 else if(is_vertical(location, "PRESSURE")) then
@@ -373,8 +373,8 @@ if(is_vertical(location, "LEVEL") .or. is_vertical(location, "SURFACE")) then
                         lon_above, lat_above, nint(level), qty)
 else
     ! Case of pressure specified in vertical
-   call error_handler(E_MSG,'model_interpolate', &
-   'doing pressure interpolation. ')
+   ! call error_handler(E_MSG,'model_interpolate', &
+   ! 'doing pressure interpolation. ')
     val(1, 1,:) =  get_val_pressure(state_handle, ens_size, &
                         lon_below, lat_below, pressure, qty, tmp_status(:,1))
     val(1, 2,:) =  get_val_pressure(state_handle, ens_size, &
@@ -485,7 +485,8 @@ do e = 1, ens_size
    ! reject somehow.
    ! write(*, *) "pfull:", pfull
    ! write(*, *) "pressure:", pressure
-   if(pressure > pfull(1, 1, 1)) then
+   ! if(pressure > pfull(1, 1, 1)) then
+   if(pressure > ps(1,1,e)) then
       top_lev(e) = 1
       bot_lev(e) = 2
       rfrac(e) = 1.0_r8
@@ -498,15 +499,19 @@ do e = 1, ens_size
       rfrac(e) = 0.0_r8
    ! Actually, just fail using istatus
       istatus(e) = 1
-   else
+   else if (pressure < ps(1,1,e) .and. pressure > pfull(1,1,1)) then
+      ! This case, pressure is between the surface pressure and first layer of upper pressure
+      frac(e) = (ps(1,1,e) - pressure) / &
+               (ps(1,1,e) - pfull(1, 1, i - top_lev(e)))
       ! write(*, *) "get_val_pressure: stage1"
       ! Search down through pressures
+
       do i = 2, grid_data%nvert
          if(pressure > pfull(1, 1, i)) then
                top_lev(e) = i + 1
                bot_lev(e) = i
                rfrac(e) = (pfull(1, 1, bot_lev(e)) - pressure) / &
-               (pfull(1, 1, bot_lev(e)) - pfull(1, 1, i - top_lev(e)))
+               (pfull(1, 1, bot_lev(e)) - pfull(1, 1, top_lev(e)))
                ! write(*, *) "top_lev: ", top_lev
                ! write(*, *) "bot_lev: ", bot_lev
                ! write(*, *) "rfrac: ", rfrac
