@@ -91,7 +91,7 @@ type(time_type) :: assimilation_time_step
 ! Use the namelist for options to be set at runtime.
 character(len=256) :: template_file = 'model_restart.nc'
 integer  :: time_step_days      = 0
-integer  :: time_step_seconds   = 3600
+integer  :: time_step_seconds   = 21600 ! six hours as assimilation time window
 integer, parameter :: max_state_variables = 100
 integer, parameter :: num_state_table_columns = 2
 
@@ -467,6 +467,7 @@ istatus(:) = 0
 ! For u or v (on velocity grid)
 
 ps(1,1,:) = get_val(state_handle, ens_size, lon_index, lat_index, -1, QTY_SURFACE_PRESSURE)
+! This is not 'surface pressure'! this is sea-level pressure
 ! write(*, *) "get_val_pressure: stage0"
 do e = 1, ens_size
    ! Next, get the values on the levels for this ps,
@@ -485,33 +486,27 @@ do e = 1, ens_size
    ! reject somehow.
    ! write(*, *) "pfull:", pfull
    ! write(*, *) "pressure:", pressure
-   ! if(pressure > pfull(1, 1, 1)) then
-   if(pressure > ps(1,1,e)) then
-      top_lev(e) = 1
-      bot_lev(e) = 2
-      rfrac(e) = 1.0_r8
+   if(pressure > pfull(1, 1, 1)) then
+   ! if(pressure > ps(1,1,e)) then
    ! Actually, just fail using istatus
       istatus(e) = 1
    else if(pressure < pfull(1, 1, grid_data%nvert)) then
-   ! Same for bottom
-      bot_lev(e) = grid_data%nvert
-      top_lev(e) = bot_lev(e) - 1
-      rfrac(e) = 0.0_r8
    ! Actually, just fail using istatus
       istatus(e) = 1
-   else if (pressure < ps(1,1,e) .and. pressure > pfull(1,1,1)) then
-      ! This case, pressure is between the surface pressure and first layer of upper pressure
-      frac(e) = (ps(1,1,e) - pressure) / &
-               (ps(1,1,e) - pfull(1, 1, i - top_lev(e)))
-      ! write(*, *) "get_val_pressure: stage1"
-      ! Search down through pressures
+   ! else if (pressure < ps(1,1,e) .and. pressure > pfull(1,1,1)) then
+   !    !  HAOXING: there have some serious problems here. How to do when pressure is over 1000hpa?
+   !    ! This case, pressure is between the surface pressure and first layer of upper pressure
+   !    top_lev(e)=2
+   !    bot_lev(e)=1
+   !    rfrac(e) = 0.0_r8 ! just for test. rfrac(e) = 0.0 means totally the bot_lev value.
 
+   else
       do i = 2, grid_data%nvert
          if(pressure > pfull(1, 1, i)) then
-               top_lev(e) = i + 1
-               bot_lev(e) = i
-               rfrac(e) = (pfull(1, 1, bot_lev(e)) - pressure) / &
-               (pfull(1, 1, bot_lev(e)) - pfull(1, 1, top_lev(e)))
+               top_lev(e) = i
+               bot_lev(e) = i-1
+               rfrac(e) = (log(pfull(1, 1, bot_lev(e))) - log(pressure)) / &
+               (log(pfull(1, 1, bot_lev(e))) - log(pfull(1, 1, top_lev(e))))
                ! write(*, *) "top_lev: ", top_lev
                ! write(*, *) "bot_lev: ", bot_lev
                ! write(*, *) "rfrac: ", rfrac
