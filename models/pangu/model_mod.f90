@@ -487,11 +487,16 @@ do e = 1, ens_size
    ! write(*, *) "pfull:", pfull
    ! write(*, *) "pressure:", pressure
    if(pressure > pfull(1, 1, 1)) then
-   ! if(pressure > ps(1,1,e)) then
-   ! Actually, just fail using istatus
+   ! Actually, just fail using istatus. pretend to give some value for top_lev etc.
+      top_lev(e) = 1
+      bot_lev(e) = 2
+      rfrac(e) = 1.0_r8
       istatus(e) = 1
    else if(pressure < pfull(1, 1, grid_data%nvert)) then
    ! Actually, just fail using istatus
+      top_lev(e) = 1
+      bot_lev(e) = 2
+      rfrac(e) = 1.0_r8
       istatus(e) = 1
    ! else if (pressure < ps(1,1,e) .and. pressure > pfull(1,1,1)) then
    !    !  HAOXING: there have some serious problems here. How to do when pressure is over 1000hpa?
