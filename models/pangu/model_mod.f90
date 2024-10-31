@@ -301,16 +301,15 @@ tmp_status = 0
 lon_lat_lev = get_location(location)
 lon = lon_lat_lev(1); lat = lon_lat_lev(2); 
 ! write(*, *) "locatioin is: ", lon_lat_lev
-if(is_vertical(location, "LEVEL")) then 
-   level = lon_lat_lev(3)
-else if(is_vertical(location, "PRESSURE")) then
+
+if(is_vertical(location, "PRESSURE")) then
    pressure = lon_lat_lev(3)
 else if(is_vertical(location, "SURFACE")) then
    ! level is not used for surface pressure observations
-   level = -1
+   level = -1 ! just give it a negative value. actually we will not use it.
 else
    call error_handler(E_ERR,'model_interpolate', &
-      'Pangu can only handle pressure or model level for obs vertical coordinate', &
+      'Pangu can only handle pressure/surface for obs vertical coordinate', &
       source, revision, revdate)
 endif
 ! get appropriate lon and lat grid specs on mass grid
@@ -360,8 +359,8 @@ if(lon >= bot_lon .and. lon <= top_lon) then
     lat_fract = 1.0_r8
  endif
 
-! Case 1: model level specified in vertical
-if(is_vertical(location, "LEVEL") .or. is_vertical(location, "SURFACE")) then
+! Case 1: surface variables
+if(is_vertical(location, "SURFACE")) then
     ! Now, need to find the values for the four corners
     val(1, 1,:) =  get_val(state_handle, ens_size, &
                         lon_below, lat_below, nint(level), qty)
@@ -597,13 +596,12 @@ if (this_qty == QTY_TEMPERATURE) then
  else if (this_qty == QTY_SURFACE_PRESSURE .or. this_qty == QTY_10M_U_WIND_COMPONENT .or. this_qty == QTY_10M_V_WIND_COMPONENT .or. this_qty == QTY_2M_TEMPERATURE) then
     lon = lons(i)
     lat = lats(j)
-    lev = 1
-    vtype = VERTISPRESSURE
-   !  vtype = VERTISSURFACE
+   !  vtype = VERTISPRESSURE
+    vtype = VERTISSURFACE
  else  ! the same as QTY_TEMPERATURE
     lon = lons(i)
     lat = lats(j)
-    lev = k
+    lev = pressure_level(k)
     vtype = VERTISPRESSURE
  endif
  ! write(*, *) 'stage before set_location'
