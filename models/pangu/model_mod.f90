@@ -11,7 +11,8 @@ module model_mod
 
 use        types_mod, only : r8, i8, MISSING_R8
 
-use time_manager_mod, only : time_type, set_time
+use time_manager_mod, only : time_type, set_time, set_date, get_date, &
+                             set_calendar_type, GREGORIAN 
 
 use     location_mod, only : location_type, get_close_type, get_location, &
                              loc_get_close_obs => get_close_obs, &
@@ -26,7 +27,7 @@ use    utilities_mod, only : error_handler, &
 
 use netcdf_utilities_mod, only : nc_add_global_attribute, nc_synchronize_file, &
                                  nc_add_global_creation_time, &
-                                 nc_begin_define_mode, nc_end_define_mode
+                                 nc_begin_define_mode, nc_end_define_mode, nc_check
 
 use   state_structure_mod,only : add_domain, get_dart_vector_index, get_domain_size, &
                                  get_dim_name, get_kind_index, get_num_dims, &
@@ -44,12 +45,13 @@ use          obs_kind_mod, only: QTY_U_WIND_COMPONENT, QTY_V_WIND_COMPONENT, &
 ! To write model specific versions of these routines
 ! remove the routine from this use statement and add your code to
 ! this the file.
-use default_model_mod, only : pert_model_copies, read_model_time, write_model_time, &
+use default_model_mod, only : pert_model_copies, &
                               init_time => fail_init_time, &
                               init_conditions => fail_init_conditions, &
                               convert_vertical_obs, convert_vertical_state, adv_1step
 
 use distributed_state_mod, only : get_state, get_state_array
+use netcdf
 
            
 implicit none
@@ -141,6 +143,7 @@ integer :: maxrows, i, numrows, rows, this_qty
 
 module_initialized = .true.
 ! write(*, *) 'stage before reading namelist'
+call set_calendar_type(GREGORIAN) ! set dart calendar type to GREGORIAN
 
 call find_namelist_in_file("input.nml", "model_nml", iunit)
 read(iunit, nml = model_nml, iostat = io)
@@ -698,6 +701,143 @@ call nc_end_define_mode(ncid)
 call nc_synchronize_file(ncid)
 
 end subroutine nc_write_model_atts
+
+!> read the time from the input file
+function read_model_time(filename)
+
+   character(len=*),  intent(in) :: filename
+   type(time_type)               :: read_model_time
+   
+   integer           :: year, month, day, hour, minute, second
+   integer           :: ret ! netcdf return code
+   integer           :: ndims, dimids(2), ivtype, ncid, var_id
+   character(len=80) :: varname
+   character(len=19) :: timestring
+   integer           :: i,  idims(2)
+   
+   call nc_check( nf90_open(filename, NF90_NOWRITE, ncid), &
+                     'opening', filename )
+   
+   call nc_check( nf90_inq_varid(ncid, "Times", var_id), 'read_model_time', &
+                  'inq_varid Times' )
+   call nc_check( nf90_inquire_variable(ncid, var_id, varname, xtype=ivtype, &
+                  ndims=ndims, dimids=dimids), 'read_model_time', &
+                  'inquire_variable Times' )
+   
+   do i=1,ndims ! isnt this just 1?
+      call nc_check( nf90_inquire_dimension(ncid, dimids(i), &
+                      len=idims(i)),'read_model_time','inquire_dimensions Times' )
+   enddo
+   
+   call nc_check( nf90_get_var(ncid, var_id, timestring, &
+                  start = (/ 1, idims(2) /)), 'read_model_time','get_var Times' )
+   
+   call get_wrf_date(timestring, year, month, day, hour, minute, second)
+   read_model_time = set_date(year, month, day, hour, minute, second)
+   
+   
+   call nc_check( nf90_close(ncid) , 'closing', filename)
+   
+   end function read_model_time
+   
+   !--------------------------------------------------------------------
+   !> write the time from the input file
+subroutine write_model_time(ncid, dart_time)
+   
+   use typeSizes
+   use netcdf
+   
+   integer,         intent(in) :: ncid
+   type(time_type), intent(in) :: dart_time
+   
+   integer :: dim_ids(2), var_id, ret
+   integer :: year, month, day, hour, minute, second
+   character(len=19) :: timestring
+   
+   call get_date(dart_time, year, month, day, hour, minute, second)
+   call set_wrf_date(timestring, year, month, day, hour, minute, second)
+   
+   call nc_begin_define_mode(ncid)
+   
+   ! Define Times variable if it does not exist
+   ret = nf90_inq_varid(ncid, "Times", var_id)
+   if (ret /= NF90_NOERR) then
+   
+      ! check to see if there is a time and date_str_length
+      ret = nf90_inq_dimid(ncid, "Time", dim_ids(2))
+      ! if Time dimension does not exist create it
+      if (ret /= NF90_NOERR) then
+         call nc_check(nf90_def_dim(ncid, "Time", nf90_unlimited, dim_ids(2)), &
+           "write_model_time def_var dimension Time")
+      endif
+   
+      ret = nf90_inq_dimid(ncid, "DateStrLen", dim_ids(1))
+      if (ret /= NF90_NOERR) then
+         ! if DateStrLen dimension does not exist create it.
+         call nc_check(nf90_def_dim(ncid, "DateStrLen", len(timestring), dim_ids(1)), &
+           "write_model_time def_var dimension dateStrLength")
+      endif
+   
+      ! use id's to set Times(Time, DateStrLen)
+      call nc_check(nf90_def_var(ncid, name="Times", xtype=nf90_char, &
+         dimids=dim_ids, varid=var_id), "write_model_time def_var Times")
+   endif
+   
+   call nc_end_define_mode(ncid)
+   
+   call nc_check( nf90_put_var(ncid, var_id, timestring), &
+                  'write_model_time', 'put_var Times' )
+   
+   end subroutine write_model_time
+   
+subroutine set_wrf_date (tstring, year, month, day, hour, minute, second)
+
+   integer,           intent(in) :: year, month, day, hour, minute, second
+   character(len=19), intent(out)  :: tstring
+   
+   character(len=4)  :: ch_year
+   character(len=2)  :: ch_month, ch_day, ch_hour, ch_minute, ch_second
+   
+   write(ch_year,'(i4)') year
+   write(ch_month,'(i2)') month
+   if (ch_month(1:1) == " ") ch_month(1:1) = "0"
+   write(ch_day,'(i2)') day
+   if (ch_day(1:1) == " ") ch_day(1:1) = "0"
+   write(ch_hour,'(i2)') hour
+   if (ch_hour(1:1) == " ") ch_hour(1:1) = "0"
+   write(ch_minute,'(i2)') minute
+   if (ch_minute(1:1) == " ") ch_minute(1:1) = "0"
+   write(ch_second,'(i2)') second
+   if (ch_second(1:1) == " ") ch_second(1:1) = "0"
+   tstring(1:4)   = ch_year
+   tstring(5:5)   = "-"
+   tstring(6:7)   = ch_month
+   tstring(8:8)   = "-"
+   tstring(9:10)  = ch_day
+   tstring(11:11) = "_"
+   tstring(12:13) = ch_hour
+   tstring(14:14) = ":"
+   tstring(15:16) = ch_minute
+   tstring(17:17) = ":"
+   tstring(18:19) = ch_second
+   
+   end subroutine set_wrf_date
+      
+subroutine get_wrf_date (tstring, year, month, day, hour, minute, second)
+
+   integer,           intent(out) :: year, month, day, hour, minute, second
+   character(len=19), intent(in)  :: tstring
+   
+   read(tstring( 1: 4),'(i4)') year
+   read(tstring( 6: 7),'(i2)') month
+   read(tstring( 9:10),'(i2)') day
+   read(tstring(12:13),'(i2)') hour
+   read(tstring(15:16),'(i2)') minute
+   read(tstring(18:19),'(i2)') second
+   
+   return
+   
+   end subroutine get_wrf_date
 
 function get_varid_from_kind(dart_kind)
 
