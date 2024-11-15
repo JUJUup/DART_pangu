@@ -216,7 +216,9 @@ real(r8),            intent(in) :: grid_size, pressure_level(nvert)
 real(r8)                        :: iter=0.0 ! temp for iteration
 integer                         :: i=1, j=1, k=1 ! for doing loops
 real(r8)                        :: lat_lower=-90.0, lat_upper=90.0, lon_lower=0.0, lon_upper=359.99
-! type(pangu_grid)                :: grid_data
+! WARNING: Pangu numpy array assumes lat from 90 to -90, which is the opposite of the lat predefined here.
+! If direct transform pangu data to nc, will cause an opposite latitude. Need to do flip the lat axis before transform.
+! Thanks Feiyu for the discussion about this bug.
 
 allocate(grid_data % lats(1:nlat))
 allocate(grid_data % lons(1:nlon))
@@ -468,7 +470,7 @@ istatus(:) = 0
 ! For t or tracers (on mass grid with ps) this is trivial
 ! For u or v (on velocity grid)
 
-ps(1,1,:) = get_val(state_handle, ens_size, lon_index, lat_index, -1, QTY_SURFACE_PRESSURE)
+! ps(1,1,:) = get_val(state_handle, ens_size, lon_index, lat_index, -1, QTY_SURFACE_PRESSURE)
 ! This is not 'surface pressure'! this is sea-level pressure
 ! write(*, *) "get_val_pressure: stage0"
 do e = 1, ens_size
