@@ -18,6 +18,7 @@ if __name__ == "__main__":
         fname = f"NR_{time}.nc"
         upper = np.zeros((5,13,721,1440))
         surf = np.zeros((4,721,1440))
+        upper=upper[:,:,::-1,:]; surf=surf[:,::-1,:] # inverse the lat axis!!!
         ds = xr.open_dataset(fname)
         for i,item in enumerate("Z,Q,T,U,V".split(",")):
             upper[i,:,:,:] = ds[item].sequence().astype(np.float32) # should be single precision!!!

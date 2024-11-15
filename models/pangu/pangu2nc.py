@@ -16,8 +16,10 @@ if __name__ == "__main__":
         # DEFINITION of netcdf variable/dimension
         upper = np.load(os.path.join(input_fname, 'output_upper.npy'))
         surf = np.load(os.path.join(input_fname, 'output_surface.npy'))
+        upper=upper[:,:,::-1,:]; surf=surf[:,::-1,:] # inverse the lat axis!!!
+        
         lev=[1000,925,850,700,600,500,400,300,250,200,150,100,50]
-        lat=np.linspace(90,-90,721)
+        lat=np.linspace(-90,90,721) # NOTE: lat should be from -90 to 90, which is opposite to the origin pangu.
         lon=np.linspace(0,359.75,1440)
         # bgrid ask the QTY_U/QTY_V to be on the velocity grid. 
         # For now, just transform U/V to velocity grid,
